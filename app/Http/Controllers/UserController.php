@@ -17,28 +17,47 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    public function getUserData(Request $request)
+public function getUserData(Request $request)
 {
-    $user = Auth::user();
+    $user = auth('api')->user();
+    $child = null;
+    $kelas = $user->kelas;
 
-    if ($user) {
-        return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'nama' => $user->nama,
-                'role' => $user->role,
-                 'kelas' => $user->kelas,
-                'foto_profil' => $user->foto_profil, // ⬅️ pastikan ini eksplisit
-                // tambahkan field lain jika perlu
-            ]
-        ], 200);
+    if ($user->role === 'orangtua') {
+        $nisnAnak = str_replace('OT_', '', $user->nisn);
+        \Log::info('NISN Anak:', [$nisnAnak]);
+
+        $child = \App\Models\User::where('nisn', $nisnAnak)
+                    ->where('role', 'siswa')
+                    ->first();
+
+        \Log::info('Child Ditemukan:', [$child]);
+
+        if ($child) {
+            $kelas = $child->kelas;
+        }
     }
 
     return response()->json([
-        'error' => 'User not authenticated'
-    ], 401);
+        'message' => 'Login berhasil!',
+        'user' => [
+            'id' => $user->id,
+            'nama' => $user->nama,
+            'role' => $user->role,
+            'kelas' => $kelas,
+            'foto_profil' => $user->foto_profil,
+            'childId' => $child?->id,
+            'student' => $child ? [
+                'id' => $child->id,
+                'nama' => $child->nama,
+                'kelas' => $child->kelas,
+                'nisn' => $child->nisn,
+            ] : null,
+        ]
+    ]);
 }
-    
+
+
     public function getUserCounts()
     {
         try {
@@ -309,9 +328,9 @@ public function siswaGender()
     }
 
     // Hitung statistik dari tabel absensi berdasarkan user_id
-    $hadir = Absensi::where('user_id', $siswa->id)->where('status', 'hadir')->count();
-    $terlambat = Absensi::where('user_id', $siswa->id)->where('status', 'terlambat')->count();
-    $tidakHadir = Absensi::where('user_id', $siswa->id)->where('status', 'tidak_hadir')->count();
+    $hadir = Absensi::where('user_id', $siswa->id)->where('status', 'Hadir')->count();
+    $terlambat = Absensi::where('user_id', $siswa->id)->where('status', 'Terlambat')->count();
+    $tidakHadir = Absensi::where('user_id', $siswa->id)->where('status', 'Tidak Hadir')->count();
 
     return response()->json([
         'nama' => $siswa->nama,
@@ -435,26 +454,37 @@ public function update(Request $request, $id)
         'kelas' => 'nullable|string|max:100',
         'tanggal_lahir' => 'nullable|date',
         'jenis_kelamin' => 'nullable|in:L,P',
-        'password' => 'nullable|string|min:8' // ✅ tambahkan validasi password
+        'password' => 'nullable|string|min:8'
     ]);
 
-    // Isi field yang bisa diisi
     $user->fill($request->only([
         'nama', 'email', 'nomor_hp', 'agama', 'kelas', 'tanggal_lahir', 'jenis_kelamin'
     ]));
 
-    // ✅ Hash dan simpan password jika ada
     if ($request->filled('password')) {
-        $user->password = Hash::make($request->password);
+        $user->password = \Hash::make($request->password);
     }
 
     $user->save();
+
+    // ✅ Update nama orang tua jika user adalah siswa
+    if ($user->role === 'siswa' && $user->nisn) {
+        $ortu = User::where('role', 'orangtua')
+            ->where('nisn', 'OT_' . $user->nisn)
+            ->first();
+
+        if ($ortu) {
+            $ortu->nama = 'Orang Tua ' . $user->nama;
+            $ortu->save();
+        }
+    }
 
     return response()->json([
         'message' => 'Data pengguna berhasil diperbarui',
         'data' => $user
     ]);
 }
+
 
 public function getAllKelas()
 {
@@ -488,7 +518,22 @@ public function destroy($id)
     try {
         $user = User::findOrFail($id);
 
-        // Opsional: hapus foto jika ada
+        // ✅ Jika yang dihapus adalah siswa, cari dan hapus akun orangtuanya
+        if ($user->role === 'siswa' && $user->nisn) {
+            $orangTua = User::where('role', 'orangtua')
+                ->where('nisn', 'OT_' . $user->nisn)
+                ->first();
+
+            if ($orangTua) {
+                // Hapus foto profil orangtua jika ada
+                if ($orangTua->foto_profil && \Storage::disk('public')->exists($orangTua->foto_profil)) {
+                    \Storage::disk('public')->delete($orangTua->foto_profil);
+                }
+                $orangTua->delete();
+            }
+        }
+
+        // Hapus foto profil siswa jika ada
         if ($user->foto_profil && \Storage::disk('public')->exists($user->foto_profil)) {
             \Storage::disk('public')->delete($user->foto_profil);
         }
@@ -496,7 +541,7 @@ public function destroy($id)
         $user->delete();
 
         return response()->json([
-            'message' => 'Akun berhasil dihapus'
+            'message' => 'Akun siswa dan akun orang tua (jika ada) berhasil dihapus'
         ], 200);
     } catch (\Exception $e) {
         return response()->json([
@@ -505,6 +550,7 @@ public function destroy($id)
         ], 500);
     }
 }
+
 public function profile()
 {
     $user = auth()->user();

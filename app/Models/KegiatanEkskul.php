@@ -9,5 +9,5 @@ class KegiatanEkskul extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['ekskul_id', 'title', 'date'];
+    protected $fillable = ['ekskul_id', 'title', 'date', 'start'];
 }

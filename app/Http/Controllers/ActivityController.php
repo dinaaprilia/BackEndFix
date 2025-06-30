@@ -40,15 +40,15 @@ class ActivityController extends Controller
 }
 public function ongoing()
 {
-    $today = Carbon::today();
+    $today = \Carbon\Carbon::today();
 
     $ekskulActivities = DB::table('kegiatan_ekskuls')
         ->join('ekskuls', 'kegiatan_ekskuls.ekskul_id', '=', 'ekskuls.id')
         ->select(
-            'kegiatan_ekskuls.title as name',
-            DB::raw("CONCAT(ekskuls.name, ' - Ekstrakurikuler') as category"),
-            'kegiatan_ekskuls.created_at as start',
-            'kegiatan_ekskuls.date as end',
+            'ekskuls.name as name', // ✅ konsisten dengan frontend
+            DB::raw("'Ekstrakurikuler' as category"),
+            DB::raw("DATE_FORMAT(kegiatan_ekskuls.created_at, '%Y-%m-%d') as start"),
+            DB::raw("DATE_FORMAT(kegiatan_ekskuls.date, '%Y-%m-%d') as end"),
             DB::raw("DATEDIFF(kegiatan_ekskuls.date, kegiatan_ekskuls.created_at) as totalDays")
         )
         ->whereDate('kegiatan_ekskuls.created_at', '<=', $today)
@@ -56,15 +56,14 @@ public function ongoing()
 
     $studyTourActivities = DB::table('info_karya_wisata')
         ->select(
-            'info_karya_wisata.title as name',
+            'title as name', // ✅ konsisten dengan frontend
             DB::raw("'Karya Wisata' as category"),
-            'info_karya_wisata.created_at as start',
-            'info_karya_wisata.tanggal as end',
-            DB::raw("DATEDIFF(info_karya_wisata.tanggal, info_karya_wisata.created_at) as totalDays")
+            DB::raw("DATE_FORMAT(created_at, '%Y-%m-%d') as start"),
+            DB::raw("DATE_FORMAT(tanggal, '%Y-%m-%d') as end"),
+            DB::raw("DATEDIFF(tanggal, created_at) as totalDays")
         )
-        ->whereDate('info_karya_wisata.created_at', '<=', $today)
-        ->whereDate('info_karya_wisata.tanggal', '>=', $today);
-
+        ->whereDate('created_at', '<=', $today)
+        ->whereDate('tanggal', '>=', $today);
 
     $ongoingActivities = $ekskulActivities
         ->unionAll($studyTourActivities)
@@ -78,39 +77,29 @@ public function ongoing()
 
 public function KegiatanSelesai()
 {
-    $today = Carbon::today()->toDateString();
+    $today = \Carbon\Carbon::today()->toDateString();
 
     $ekskulActivities = DB::table('kegiatan_ekskuls')
         ->join('ekskuls', 'kegiatan_ekskuls.ekskul_id', '=', 'ekskuls.id')
+        ->whereDate('kegiatan_ekskuls.date', '<', $today)
         ->select(
             'kegiatan_ekskuls.title as name',
-            DB::raw("CONCAT(ekskuls.name, ' - Ekstrakurikuler') as category"),
-            'kegiatan_ekskuls.created_at as start',
-            'kegiatan_ekskuls.date as end'
-        )
-        ->whereDate('kegiatan_ekskuls.date', '<', $today);
+            DB::raw("'Ekstrakurikuler' as category"),
+            DB::raw("DATE_FORMAT(kegiatan_ekskuls.created_at, '%Y-%m-%d') as start"),
+            DB::raw("DATE_FORMAT(kegiatan_ekskuls.date, '%Y-%m-%d') as end")
+        );
 
     $studyTourActivities = DB::table('info_karya_wisata')
+        ->whereDate('tanggal', '<', $today)
         ->select(
-            'info_karya_wisata.title as name',
+            'title as name',
             DB::raw("'Karya Wisata' as category"),
-            'info_karya_wisata.created_at as start',
-            'info_karya_wisata.tanggal as end'
-        )
-        ->whereDate('info_karya_wisata.tanggal', '<', $today);
-
-    $pameranActivities = DB::table('info_pameran')
-        ->select(
-            'info_pameran.title as name',
-            DB::raw("'Pameran' as category"),
-            'info_pameran.created_at as start',
-            'info_pameran.tanggal as end'
-        )
-        ->whereDate('info_pameran.tanggal', '<', $today);
+            DB::raw("DATE_FORMAT(created_at, '%Y-%m-%d') as start"),
+            DB::raw("DATE_FORMAT(tanggal, '%Y-%m-%d') as end")
+        );
 
     $activities = $ekskulActivities
         ->unionAll($studyTourActivities)
-        ->unionAll($pameranActivities)
         ->get();
 
     return response()->json([
@@ -118,7 +107,6 @@ public function KegiatanSelesai()
         'data' => $activities
     ]);
 }
-
 
 public function PesertaOngoing()
 {
@@ -194,29 +182,60 @@ public function PenanggungJawab()
 
 public function semuaKegiatan()
 {
+    $currentUser = auth()->user();
+    $namaLogin = $currentUser ? $currentUser->nama : 'Admin';
+    
+
+    // Ambil data ekskul
     $ekskulActivities = DB::table('kegiatan_ekskuls')
         ->join('ekskuls', 'kegiatan_ekskuls.ekskul_id', '=', 'ekskuls.id')
+        ->leftJoin('anggota_ekskul', 'ekskuls.id', '=', 'anggota_ekskul.ekskul_id')
         ->select(
-            'ekskuls.name as nama_kegiatan',
-            DB::raw("'Ekstrakurikuler' as category"),
-            'kegiatan_ekskuls.created_at as start',
-            'kegiatan_ekskuls.date as end',
-            DB::raw("DATEDIFF(kegiatan_ekskuls.date, kegiatan_ekskuls.created_at) as totalDays")
-        );
+    'kegiatan_ekskuls.title as nama_kegiatan',
+    DB::raw("CONCAT(ekskuls.name, ' - Ekstrakurikuler') as category"),
+    'kegiatan_ekskuls.date as start',
+    'kegiatan_ekskuls.created_at as end',
+    'ekskuls.mentor as penanggung_jawab',
+    DB::raw('COUNT(anggota_ekskul.id) as jumlah_peserta'),
+    DB::raw("'0' as is_karya_wisata") 
+)
 
-    $studyTourActivities = DB::table('info_karya_wisata')
-        ->select(
-            'title as nama_kegiatan',
-            DB::raw("'Karya Wisata' as category"),
-            'created_at as start',
-            'tanggal as end',
-            DB::raw("DATEDIFF(tanggal, created_at) as totalDays")
-        );
-
-
-    $allActivities = $ekskulActivities
-        ->unionAll($studyTourActivities)
+        ->groupBy(
+            'kegiatan_ekskuls.title',
+            'ekskuls.name',
+            'kegiatan_ekskuls.date',
+            'kegiatan_ekskuls.created_at',
+            'ekskuls.mentor'
+        )
         ->get();
+
+    // Ambil data karya wisata TANPA penanggung_jawab
+    $studyTourActivities = DB::table('info_karya_wisata')
+    ->leftJoin('absensi_karya_wisata', function ($join) {
+        $join->on('info_karya_wisata.title', '=', 'absensi_karya_wisata.judul')
+            ->on('info_karya_wisata.tanggal', '=', 'absensi_karya_wisata.tanggal');
+    })
+    ->leftJoin('users', 'info_karya_wisata.user_id', '=', 'users.id')
+    ->select(
+    'info_karya_wisata.title as nama_kegiatan',
+    DB::raw("'Karya Wisata' as category"),
+    'info_karya_wisata.created_at as start',
+    'info_karya_wisata.tanggal as end',
+    DB::raw('COUNT(absensi_karya_wisata.id) as jumlah_peserta'),
+    'users.nama as penanggung_jawab',
+    DB::raw("'1' as is_karya_wisata") 
+)
+
+    ->groupBy(
+        'info_karya_wisata.title',
+        'info_karya_wisata.tanggal',
+        'info_karya_wisata.created_at',
+        'users.nama' // ✅ ini wajib kalau dipakai di select
+    )
+    ->get();
+
+    // Gabungkan ekskul + karya wisata
+    $allActivities = $ekskulActivities->merge($studyTourActivities);
 
     return response()->json([
         'status' => 'success',
@@ -309,6 +328,49 @@ public function PerjalananSebelumnya()
     $combined = $studyTour->merge($pameran)->values();
 
     return response()->json($combined);
+}
+public function getPesertaKegiatan(Request $request)
+{
+    $judul = $request->query('judul');
+    $tanggal = $request->query('tanggal');
+
+    // 🔍 1. Coba cari di absensi_karya_wisata langsung
+    $peserta = DB::table('absensi_karya_wisata')
+        ->where('judul', $judul)
+        ->where('tanggal', $tanggal)
+        ->join('users', 'absensi_karya_wisata.user_id', '=', 'users.id')
+        ->select('users.nama', 'absensi_karya_wisata.kelas', 'users.nisn')
+        ->get();
+
+    if ($peserta->isNotEmpty()) {
+        return response()->json([
+            'status' => 'success',
+            'data' => $peserta
+        ]);
+    }
+
+    // 🔁 2. Kalau kosong, coba cari sebagai kegiatan ekskul
+    $ekskul = DB::table('kegiatan_ekskuls')
+        ->where('title', $judul)
+        ->first();
+
+    if (!$ekskul) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Kegiatan tidak ditemukan.'
+        ], 404);
+    }
+
+    $peserta = DB::table('anggota_ekskul')
+        ->where('ekskul_id', $ekskul->ekskul_id)
+        ->join('users', 'anggota_ekskul.user_id', '=', 'users.id')
+        ->select('users.nama', 'users.kelas', 'users.nisn')
+        ->get();
+
+    return response()->json([
+        'status' => 'success',
+        'data' => $peserta
+    ]);
 }
 
 }

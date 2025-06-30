@@ -13,7 +13,7 @@ class User extends Authenticatable implements JWTSubject
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'nama', 'role', 'nisn', 'nip', 'kelas', 'jenis_kelamin', 'agama', 'email', 'password', 'foto_profil', 'tanggal_lahir', 'nomor_hp',
+        'nama', 'role', 'nisn', 'nip', 'kelas', 'jenis_kelamin', 'agama', 'email', 'password', 'foto_profil', 'tanggal_lahir', 'nomor_hp', 'anak_nisn'
     ];
 
     protected $hidden = [
@@ -65,6 +65,11 @@ public function anak()
 public function orangtua()
 {
     return $this->belongsTo(User::class, 'orangtua_id');
+}
+
+public function informasi()
+{
+    return $this->hasMany(InformasiUmum::class);
 }
 
 

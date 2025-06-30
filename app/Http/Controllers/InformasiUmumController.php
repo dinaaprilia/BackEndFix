@@ -3,6 +3,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\InformasiUmum;
+use Illuminate\Support\Facades\Auth;
+use App\Models\User;
+
 
 class InformasiUmumController extends Controller
 {
@@ -11,27 +14,25 @@ class InformasiUmumController extends Controller
         return response()->json(InformasiUmum::orderBy('date', 'desc')->get());
     }
 
-    public function store(Request $request)
+public function store(Request $request)
 {
-    \Log::info('📥 Data diterima dari frontend:', $request->all());
+    $user = Auth::guard('api')->user();
+    if (!$user) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
 
-    $validated = $request->validate([
-        'date' => 'required|date',
-        'title' => 'required|string|max:255',
-        'text' => 'required|string',
-        'author' => 'nullable|string',
-        'photo' => 'nullable|string',
-        'time' => 'required|string',
-        'color' => 'nullable|string',
+    $info = InformasiUmum::create([
+        'title' => $request->title,
+        'text' => $request->text,
+        'photo' => $user->foto_profil ?? 'default.jpg',
+        'date' => $request->date,
+        'time' => $request->time,
+        'color' => $request->color,
+        'author' => $user->nama,
+        'user_id' => $user->id,
     ]);
 
-    // Tambahkan user_id ke data yang akan disimpan
-    $validated['user_id'] = auth()->id();
-
-    $info = InformasiUmum::create($validated);
-
-    // Kembalikan seluruh data termasuk relasi user
-    return InformasiUmum::with('user:id,nama,foto_profil')->orderBy('date', 'desc')->get();
+    return response()->json($info);
 }
 
 

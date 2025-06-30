@@ -5,26 +5,31 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\InfoKaryaWisata;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class InfoKaryaWisataController extends Controller
 {
     // Menyimpan atau memperbarui data info karya wisata (karena hanya 1 entry)
-    public function storeOrUpdate(Request $request)
-    {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'tanggal' => 'required|date',
-        ]);
+public function storeOrUpdate(Request $request)
+{
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'tanggal' => 'required|date',
+        'start' => 'nullable|date', // 💡 Tambahkan start sebagai optional
+    ]);
 
-        // Simpan atau update entri pertama (asumsi hanya ada 1)
-        $info = InfoKaryaWisata::create($validated);
+   $info = new InfoKaryaWisata();
+$info->title = $validated['title'];
+$info->tanggal = $validated['tanggal'];
+$info->user_id = auth()->id();
+$info->save(); // ⛔️ Jangan set created_at manual
 
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $info
-        ]);
-    }
+    return response()->json([
+        'status' => 'success',
+        'data' => $info
+    ]);
+}
 
     // Ambil info karya wisata yang terakhir
     public function show()
@@ -50,7 +55,9 @@ public function list()
 }
 public function getCurrentTitle()
 {
-    $info = \App\Models\InfoKaryaWisata::first();
+    $info = InfoKaryaWisata::whereNotNull('user_id') // agar hanya ambil yang kamu input, bukan data dummy lama
+        ->orderByDesc('created_at') // berdasarkan waktu input
+        ->first();
 
     if (!$info) {
         return response()->json([
@@ -67,6 +74,8 @@ public function getCurrentTitle()
         ]
     ]);
 }
+
+
 public function store(Request $request)
 {
     $validated = $request->validate([
@@ -74,13 +83,18 @@ public function store(Request $request)
         'tanggal' => 'required|date',
     ]);
 
-    $info = InfoKaryaWisata::create($validated);
+    $info = new InfoKaryaWisata();
+    $info->title = $validated['title'];
+    $info->tanggal = $validated['tanggal'];
+    $info->user_id = auth()->id(); // kalau pakai auth
+    $info->save();
 
     return response()->json([
         'status' => 'success',
         'data' => $info
     ]);
 }
+
 public function index()
 {
     $data = InfoKaryaWisata::orderByDesc('created_at')->first(); // Ambil yang paling baru
@@ -118,12 +132,13 @@ public function getPesertaByJudulTanggal(Request $request)
         ], 404);
     }
 
-    // Ambil data absensi berdasarkan judul yang cocok
-    $peserta = DB::table('absensi_karya_wisata as a')
-        ->join('users as u', 'a.user_id', '=', 'u.id')
-        ->select('u.nama', 'u.kelas', 'a.status', 'a.waktu')
-        ->whereRaw('LOWER(a.judul) = ?', [strtolower($info->title)])
-        ->get();
+    // ✅ Tambahkan filter tanggal juga di sini
+   $peserta = DB::table('absensi_karya_wisata as a')
+    ->join('users as u', 'a.user_id', '=', 'u.id')
+    ->select('u.nama', 'u.kelas', 'a.status', 'a.waktu')
+    ->whereRaw('LOWER(a.judul) = ?', [strtolower($info->title)])
+    ->whereDate('a.tanggal', \Carbon\Carbon::parse($request->tanggal)->toDateString())
+    ->get();
 
     return response()->json([
         'status' => 'success',
@@ -163,6 +178,24 @@ public function getGaleriByJudulTanggal(Request $request)
         'data' => $galeri
     ]);
 }
+public function update(Request $request, $id)
+{
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'tanggal' => 'required|date',
+    ]);
+
+    $info = InfoKaryaWisata::findOrFail($id);
+    $info->title = $validated['title'];
+    $info->tanggal = $validated['tanggal'];
+    $info->save();
+
+    return response()->json([
+        'status' => 'success',
+        'data' => $info
+    ]);
+}
+
 
 }
 

@@ -41,7 +41,7 @@ Route::post('/absensi-karya-wisata', [AbsensiKaryaWisataController::class, 'stor
 Route::get('/users/siswa', [UserController::class, 'getAllSiswa']);
 Route::get('/absensi-karya-wisata', [AbsensiKaryaWisataController::class, 'index']);
 Route::get('/karya-wisata-info', [InfoKaryaWisataController::class, 'show']);
-Route::post('/karya-wisata-info', [InfoKaryaWisataController::class, 'storeOrUpdate']);
+Route::middleware('auth:api')->post('/karya-wisata-info', [InfoKaryaWisataController::class, 'storeOrUpdate']);
 Route::post('/ikut-serta-karya-wisata', [IkutSertaKaryaWisataController::class, 'store']);
 Route::get('/ikut-serta-karya-wisata', [IkutSertaKaryaWisataController::class, 'show']);
 
@@ -119,7 +119,7 @@ Route::post('/events', [EventController::class, 'store']);
 Route::delete('/events/{date}', [EventController::class, 'destroy']);
 
 Route::get('/informasi', [InformasiUmumController::class, 'index']);
-Route::post('/informasi', [InformasiUmumController::class, 'store']);
+Route::middleware('auth:api')->post('/input-informasi', [InformasiUmumController::class, 'store']);
 Route::put('/informasi/{id}', [InformasiUmumController::class, 'update']);
 Route::delete('/informasi/{id}', [InformasiUmumController::class, 'destroy']);
 
@@ -261,3 +261,7 @@ Route::get('/karya-wisata-riwayat', [InfoKaryaWisataController::class, 'list']);
 Route::get('/karya-wisata-info/current-title', [InfoKaryaWisataController::class, 'latest']);
 Route::get('/karya-wisata/partisipasi', [InfoKaryaWisataController::class, 'getPesertaByJudulTanggal']);
 Route::get('/karya-wisata/galeri', [InfoKaryaWisataController::class, 'getGaleriByJudulTanggal']);
+Route::get('/peserta-karya-wisata', [ActivityController::class, 'getPesertaKegiatan']);
+Route::middleware('auth:api')->get('/absensi-anak', [AbsensiController::class, 'absensiAnak']);
+Route::get('/absensi-karya-wisata/peserta', [AbsensiKaryaWisataController::class, 'getPesertaByJudulTanggal']);
+Route::put('/karya-wisata-info/{id}', [InfoKaryaWisataController::class, 'update']);

@@ -182,7 +182,23 @@ public function piketSaya(Request $request)
     $bulan = $request->query('bulan', now()->month);
     $tahun = $request->query('tahun', now()->year);
 
-    $piket = Piket::where('user_id', $user->id)
+    if ($user->role === 'orangtua') {
+        $nisnAnak = str_replace('OT_', '', $user->nisn);
+
+        $anak = \App\Models\User::where('nisn', $nisnAnak)->first();
+
+        if (!$anak) {
+            return response()->json([
+                'error' => 'Data anak tidak ditemukan',
+            ], 404);
+        }
+
+        $targetUserId = $anak->id;
+    } else {
+        $targetUserId = $user->id;
+    }
+
+    $piket = \App\Models\Piket::where('user_id', $targetUserId)
         ->whereMonth('tanggal', $bulan)
         ->whereYear('tanggal', $tahun)
         ->orderBy('tanggal', 'asc')
@@ -198,6 +214,7 @@ public function piketSaya(Request $request)
 
     return response()->json($data);
 }
+
 public function riwayatByNISN($nisn, Request $request)
 {
     $user = User::where('nisn', $nisn)->first();

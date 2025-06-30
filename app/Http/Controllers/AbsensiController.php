@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class AbsensiController extends Controller
 {
@@ -174,8 +175,8 @@ public function getAbsensi(Request $request)
 
     $kelasList = [
         "X-A", "X-B", "X-C",
-        "XI-A", "XI-B", "XII-C",
-        "XII-A", "XIIB", "XII-C",
+        "XI-A", "XI-B", "XI-C",
+        "XII-A", "XII-B", "XII-C",
     ];
 
     $data = [];
@@ -324,6 +325,9 @@ public function listAbsensi(Request $request)
     // Filter hanya user dengan nisn tidak null dan tidak kosong
     $query->whereNotNull('nisn')->where('nisn', '!=', '');
 
+    // Filter role hanya siswa
+    $query->where('role', 'siswa');
+
     // Filter nama jika ada
     if ($request->has('search') && $request->search !== '') {
         $query->where('nama', 'like', '%' . $request->search . '%');
@@ -361,10 +365,10 @@ public function listAbsensi(Request $request)
     return response()->json($data);
 }
 
+
 public function getAbsensiByNisn(Request $request)
 {
-    $nisn = $request->query('nisn');  // Ambil nisn dari query parameter
-
+    $nisn = $request->query('nisn'); 
     if (!$nisn) {
         return response()->json([
             'message' => 'Parameter nisn harus disertakan.'
@@ -379,7 +383,6 @@ public function getAbsensiByNisn(Request $request)
         ], 404);
     }
 
-    // Ambil data absensi
     $absensi = Absensi::where('user_id', $siswa->id)
         ->orderBy('tanggal', 'desc')
         ->get(['tanggal', 'status', 'waktu_absen']);
@@ -421,8 +424,11 @@ public function hariIni(Request $request)
 {
     $tanggal = $request->query('tanggal');
     $nisn = $request->query('nisn');
+    $studentId = $request->query('studentId');
 
-    if ($nisn) {
+    if ($studentId) {
+        $user_id = $studentId;
+    } elseif ($nisn) {
         $user = User::where('nisn', $nisn)->first();
         if (!$user) {
             return response()->json([
@@ -430,10 +436,9 @@ public function hariIni(Request $request)
                 'message' => 'User dengan NISN tidak ditemukan',
             ]);
         }
-
         $user_id = $user->id;
     } else {
-        $user_id = auth()->id(); // default untuk siswa login
+        $user_id = auth()->id();
     }
 
     $absensi = \App\Models\Absensi::where('user_id', $user_id)
@@ -557,6 +562,50 @@ public function absensiHariIniByKelas(Request $request)
         'mulai' => $first->mulai,
         'selesai' => $first->selesai,
         'last_edit' => $first->updated_at->format('d F Y - H:i'),
+    ]);
+}
+
+public function absensiAnak(Request $request)
+{
+    $user = auth()->user();
+
+    if ($user->role !== 'orangtua') {
+        return response()->json([
+            'status' => null,
+            'message' => 'Hanya role orangtua yang bisa mengakses absensi anak.'
+        ], 403);
+    }
+
+    // Ambil NISN dari nip ortu (OT_1234123)
+    $nisn = str_replace('OT_', '', $user->nisn);
+
+    // Cari user anak (role siswa) berdasarkan NISN
+    $siswa = User::where('role', 'siswa')->where('nisn', $nisn)->first();
+
+    if (!$siswa) {
+        return response()->json([
+            'status' => null,
+            'message' => 'Anak tidak ditemukan.'
+        ], 404);
+    }
+
+    $tanggal = $request->query('tanggal') ?? date('Y-m-d');
+
+    // Cek absensi berdasarkan user_id siswa
+    $absensi = Absensi::where('user_id', $siswa->id)
+        ->whereDate('tanggal', $tanggal)
+        ->first();
+
+    if (!$absensi) {
+        return response()->json([
+            'status' => null,
+            'message' => 'Absensi belum tersedia'
+        ]);
+    }
+
+    return response()->json([
+        'status' => $absensi->status,
+        'message' => 'Berhasil mengambil absensi anak'
     ]);
 }
 

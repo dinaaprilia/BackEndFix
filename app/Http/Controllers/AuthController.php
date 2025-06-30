@@ -10,12 +10,11 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-
-
+use Illuminate\Support\Carbon; 
 
 class AuthController extends Controller
 {
-    public function register(Request $request)
+public function register(Request $request)
 {
     // Validasi input
     $request->validate([
@@ -62,16 +61,17 @@ class AuthController extends Controller
 
     // ✅ Tambahkan otomatis akun orangtua jika role = siswa
     if ($request->role === 'siswa') {
-        // Cek apakah sudah ada akun orangtua agar tidak duplikat
         $ortuNisn = 'OT_' . $request->nisn;
+
+        // Cek apakah sudah ada akun orangtua agar tidak duplikat
         if (!User::where('nisn', $ortuNisn)->exists()) {
             User::create([
                 'nama' => 'Orangtua ' . $request->nama,
                 'role' => 'orangtua',
                 'nisn' => $ortuNisn,
-                'anak_nisn' => $request->nisn,
-                'email' => 'ortu.' . $request->email, // pastikan tidak duplicate
-                'password' => bcrypt($request->tanggal_lahir), // pakai tgl lahir siswa
+                'anak_nisn' => $request->nisn, // ⬅️ Diisi otomatis di sini
+                'email' => 'ortu.' . $request->email,
+                'password' => Hash::make(Carbon::parse($request->tanggal_lahir)->format('Y-m-d')),
             ]);
         }
     }
@@ -89,23 +89,24 @@ class AuthController extends Controller
 }
 
 
+
 public function index()
-    {
+{
         $users = User::all();
         return response()->json($users);
-    }
+}
+
     
 public function login(Request $request)
 {
     try {
         $request->validate([
-    'identifier' => 'required|string',
-    'password' => 'required|string',
-], [
-    'identifier.required' => 'NIP, NISN, atau email harus diisi.',
-    'password.required' => 'Password tidak boleh kosong.',
-]);
-
+            'identifier' => 'required|string',
+            'password' => 'required|string',
+        ], [
+            'identifier.required' => 'NIP, NISN, atau email harus diisi.',
+            'password.required' => 'Password tidak boleh kosong.',
+        ]);
 
         $user = User::where('nisn', $request->identifier)
                     ->orWhere('nip', $request->identifier)
@@ -122,21 +123,39 @@ public function login(Request $request)
 
         $token = JWTAuth::fromUser($user);
 
-        // ✅ Letakkan log aktivitas di sini:
-        \App\Models\UserActivity::create([
-            'user_id' => $user->id,
-            'action' => 'Login',
-            'description' => 'User berhasil login.',
-        ]);
+// ✅ Siapkan variabel child
+$child = null;
+if ($user->role === 'orangtua') {
+    $child = User::where('nisn', $user->anak_nisn)->first();
+}
 
-        return response()->json([
-            'message' => 'Login berhasil!',
-            'user' => $user,
-            'token' => $token,
-            'token_type' => 'bearer',
-            'expires_in' => auth('api')->factory()->getTTL() * 60
-        ]);
-        
+// ✅ Catat log aktivitas
+\App\Models\UserActivity::create([
+    'user_id' => $user->id,
+    'action' => 'Login',
+    'description' => 'User berhasil login.',
+]);
+
+// ✅ Return JSON dengan child info
+return response()->json([
+    'message' => 'Login berhasil!',
+    'user' => [
+        'id' => $user->id,
+        'nama' => $user->nama,
+        'role' => $user->role,
+        'kelas' => $user->kelas,
+        'foto_profil' => $user->foto_profil,
+        'childId' => $child?->id,
+        'student' => $child ? [
+            'id' => $child->id,
+            'nama' => $child->nama,
+            'kelas' => $child->kelas,
+        ] : null,
+    ],
+    'token' => $token,
+    'token_type' => 'bearer',
+    'expires_in' => auth('api')->factory()->getTTL() * 60
+]);
     } catch (\Throwable $e) {
         \Log::error('Login Error: ' . $e->getMessage());
         return response()->json([
@@ -145,8 +164,6 @@ public function login(Request $request)
         ], 500);
     }
 }
-
-
     // Logout method (opsional)
     public function logout()
     {

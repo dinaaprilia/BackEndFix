@@ -101,9 +101,23 @@ public function ekskulSaya(Request $request)
 {
     $user = auth()->user();
 
-    $anggota = \App\Models\AnggotaEkskul::with('ekskul')
-        ->where('user_id', $user->id)
-        ->get();
+    if ($user->role === 'orangtua') {
+        $nisnAnak = str_replace('OT_', '', $user->nisn);
+
+        $anak = \App\Models\User::where('nisn', $nisnAnak)->first();
+
+        if (!$anak) {
+            return response()->json(['message' => 'Data anak tidak ditemukan'], 404);
+        }
+
+        $anggota = \App\Models\AnggotaEkskul::with('ekskul')
+            ->where('user_id', $anak->id)
+            ->get();
+    } else {
+        $anggota = \App\Models\AnggotaEkskul::with('ekskul')
+            ->where('user_id', $user->id)
+            ->get();
+    }
 
     $data = $anggota->map(function ($item) {
         return [
@@ -111,10 +125,12 @@ public function ekskulSaya(Request $request)
             'name' => $item->ekskul->name,
             'mentor' => $item->ekskul->mentor,
             'image' => $item->ekskul->image,
+            'tanggalBergabung' => $item->created_at->format('Y-m-d'),
         ];
     });
 
     return response()->json($data);
 }
+
 
 }

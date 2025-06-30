@@ -26,12 +26,13 @@ class KegiatanEkskulController extends Controller
             'ekskul_id' => $ekskulId,
             'title'     => $request->title,
             'date'      => $request->date,
+            'start'     => $request->start ?? now(), 
         ]);
 
         return response()->json(['message' => 'Kegiatan berhasil ditambahkan', 'data' => $kegiatan], 201);
     }
 
- public function update(Request $request, $ekskulId, $id)
+public function update(Request $request, $ekskulId, $id)
 {
     $kegiatan = KegiatanEkskul::where('ekskul_id', $ekskulId)->where('id', $id)->first();
 
@@ -40,8 +41,9 @@ class KegiatanEkskulController extends Controller
     }
 
     $kegiatan->update([
-        'title' => $request->input('title'),  // <- pastikan ini bukan null
+        'title' => $request->input('title'),
         'date'  => $request->input('date'),
+        'start' => $request->input('start'), // ✅ tambahkan ini
     ]);
 
     return response()->json([
@@ -49,7 +51,6 @@ class KegiatanEkskulController extends Controller
         'data' => $kegiatan
     ]);
 }
-
 
     public function destroy($id)
     {

@@ -18,9 +18,17 @@ public function store(Request $request)
         'data.*.user_id' => 'required|exists:users,id',
         'data.*.status' => 'required|string',
         'data.*.waktu' => 'required|string',
-        'data.*.tanggal' => 'required|string',
     ]);
 
+    // ✅ Ambil tanggal dari info_karya_wisata berdasarkan judul
+    $info = InfoKaryaWisata::whereRaw('LOWER(title) = ?', [strtolower($request->judul)])->first();
+
+    if (!$info) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Judul tidak ditemukan di info_karya_wisata.'
+        ], 404);
+    }
 
     foreach ($request->data as $absen) {
         AbsensiKaryaWisata::create([
@@ -28,7 +36,7 @@ public function store(Request $request)
             'kelas' => $request->kelas,
             'status' => $absen['status'],
             'waktu' => $absen['waktu'],
-            'tanggal' => $absen['tanggal'],
+            'tanggal' => $info->tanggal, // ✅ Gunakan tanggal resmi dari info_karya_wisata
             'judul' => $request->judul,
         ]);
     }
@@ -38,6 +46,7 @@ public function store(Request $request)
         'message' => 'Data absensi berhasil disimpan.'
     ]);
 }
+
 
 public function index(Request $request)
 {
@@ -52,13 +61,35 @@ public function index(Request $request)
     }
 
     // ✅ Tambahkan filter tanggal agar tidak error saat query
-    if ($request->has('tanggal')) {
-        $query->where('tanggal', $request->tanggal);
+  if ($request->has('tanggal')) {
+    $query->whereDate('tanggal', $request->tanggal);
     }
 
     $data = $query->get();
 
     return response()->json(['data' => $data]);
+}
+public function getPesertaByJudulTanggal(Request $request)
+{
+    $judul = strtolower($request->judul);
+    $tanggal = $request->tanggal;
+
+    $data = AbsensiKaryaWisata::with('user')
+        ->whereRaw('LOWER(judul) = ?', [$judul])
+        ->whereDate('tanggal', $tanggal)
+        ->get();
+
+    return response()->json([
+        'status' => 'success',
+        'data' => $data->map(function ($item) {
+            return [
+                'nama' => $item->user->nama ?? '-',
+                'kelas' => $item->kelas ?? '-',
+                'status' => $item->status,
+                'waktu' => $item->waktu,
+            ];
+        })
+    ]);
 }
 
 }
