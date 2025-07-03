@@ -63,84 +63,93 @@ class PiketController extends Controller
     }
 
     public function updateStatusJikaWaktuSelesai($kelas, $tanggal)
-    {
-        $piketBelumHadir = Piket::where('kelas', $kelas)
-            ->where('tanggal', $tanggal)
-            ->where('status', '!=', 'hadir')
-            ->get();
+{
+    // Ambil data absensi yang statusnya bukan 'berkontribusi' (misal kosong atau belum diupdate)
+    // atau kamu bisa tentukan kondisi lain sesuai kebutuhan
+    $absensiBelumHadir = Piket::where('kelas', $kelas)
+        ->where('tanggal', $tanggal)
+        ->where('status', '!=', 'berkontribusi') // atau kondisi lain jika status masih kosong, dll.
+        ->get();
 
-        $now = date('H:i'); 
+    $now = date('H:i'); // jam saat ini (format 24 jam, misal "15:30")
 
-        $jamSelesai = Piket::where('kelas', $kelas)
-            ->where('tanggal', $tanggal)
-            ->value('selesai');
+    // Ambil jam selesai dari absensi yang sudah ada, kalau ada banyak, ambil salah satu (asumsi sama)
+    $jamSelesai = Piket::where('kelas', $kelas)
+        ->where('tanggal', $tanggal)
+        ->value('selesai');
 
-        if (!$jamSelesai) {
-            return response()->json(['message' => 'Jam selesai belum diatur.'], 400);
-        }
-
-        if ($now >= $jamSelesai) {
-            Piket::where('kelas', $kelas)
-                ->where('tanggal', $tanggal)
-                ->where('status', '!=', 'berkontribusi')
-                ->update(['status' => 'tidak berkontribusi']);
-
-            return response()->json(['message' => 'Status piket otomatis diupdate menjadi tidak hadir.']);
-        }
-
-        return response()->json(['message' => 'Belum waktunya update status.']);
+    if (!$jamSelesai) {
+        // Jika belum ada jam selesai, return
+        return response()->json(['message' => 'Jam selesai belum diatur.'], 400);
     }
 
-        public function inputPiket(Request $request)
-    {
-        $request->validate([
-            'kelas' => 'required|string',
-            'tanggal' => 'required|date',
-            'hari' => 'required|string',
-            'mulai' => 'required|string',
-            'selesai' => 'required|string',
-            'piket' => 'required|array',
-            'piket.*.nisn' => 'required|string',
-            'piket.*.status' => 'required|string',
-            'piket.*.waktu_absen' => 'required|string',
-        ]);
+    if ($now >= $jamSelesai) {
+        // Update semua yang belum berkontribusi jadi 'tidak berkontribusi'
+        Piket::where('kelas', $kelas)
+            ->where('tanggal', $tanggal)
+            ->where('status', '!=', 'berkontribusi')
+            ->update(['status' => 'tidak berkontribusi']);
 
-        $kelas = $request->kelas;
-        $tanggal = $request->tanggal;
-        $hari = $request->hari;
-        $mulai = $request->mulai;
-        $selesai = $request->selesai;
-        $piketData = $request->piket;
+        return response()->json(['message' => 'Status absensi otomatis diupdate menjadi tidak berkontribusi.']);
+    }
 
-        foreach ($piketData as $item) {
-            $user = User::where('nisn', $item['nisn'])->first();
+    return response()->json(['message' => 'Belum waktunya update status.']);
+}
 
-            if (!$user) {
-                continue;
-            }
+public function inputPiket(Request $request)
+{
+    $request->validate([
+        'kelas' => 'required|string',
+        'tanggal' => 'required|date',
+        'hari' => 'required|string',
+        'mulai' => 'required|string',
+        'selesai' => 'required|string',
+        'piket' => 'required|array',
+        'piket.*.nisn' => 'required|string',
+        'piket.*.status' => 'required|string',
+        'piket.*.waktu_absen' => 'required|string',
+    ]);
 
-            Piket::updateOrCreate(
-                [
-                    'user_id' => $user->id,
-                    'kelas' => $kelas,
-                    'tanggal' => $tanggal,
-                ],
-                [
-                    'hari' => $hari,
-                    'mulai' => $mulai,
-                    'selesai' => $selesai,
-                    'status' => $item['status'],
-                    'waktu_absen' => $item['waktu_absen'],
-                ]
-            );
+    $kelas = $request->kelas;
+    $tanggal = $request->tanggal;
+    $hari = $request->hari;
+    $mulai = $request->mulai;
+    $selesai = $request->selesai;
+    $absensiData = $request->piket;
+
+    foreach ($absensiData as $item) {
+        // Cari user berdasarkan nisn
+        $user = User::where('nisn', $item['nisn'])->first();
+
+        if (!$user) {
+            // Skip jika user tidak ditemukan
+            continue;
         }
 
-        $this->updateStatusJikaWaktuSelesai($kelas, $tanggal);
-
-        return response()->json([
-            'message' => 'Piket berhasil disimpan atau diperbarui.'
-        ], 200);
+        // Gunakan updateOrCreate untuk mencegah duplikasi absensi
+        Piket::updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'kelas' => $kelas,
+                'tanggal' => $tanggal,
+            ],
+            [
+                'hari' => $hari,
+                'mulai' => $mulai,
+                'selesai' => $selesai,
+                'status' => $item['status'],
+                'waktu_absen' => $item['waktu_absen'],
+            ]
+        );
     }
+
+    $this->updateStatusTidakHadirJikaWaktuSelesai($kelas, $tanggal);
+
+
+    return response()->json([
+        'message' => 'Piket berhasil disimpan atau diperbarui.'
+    ], 200);
+}
     
     public function rekapKontribusiBulanan(Request $request)
     {
