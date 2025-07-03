@@ -45,8 +45,9 @@ public function getUserData(Request $request)
             'nama' => $user->nama,
             'role' => $user->role,
             'kelas' => $kelas,
-        'foto_profil' => asset('storage/' . $user->foto_profil),
-            'childId' => $child?->id,
+'foto_profil' => $user->foto_profil 
+            ? asset('storage/' . $user->foto_profil)
+            : null,            'childId' => $child?->id,
             'student' => $child ? [
                 'id' => $child->id,
                 'nama' => $child->nama,
