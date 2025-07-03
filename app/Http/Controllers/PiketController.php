@@ -91,9 +91,8 @@ class PiketController extends Controller
         return response()->json(['message' => 'Belum waktunya update status.']);
     }
 
-    public function inputPiket(Request $request)
-{
-    try {
+        public function inputPiket(Request $request)
+    {
         $request->validate([
             'kelas' => 'required|string',
             'tanggal' => 'required|date',
@@ -141,14 +140,8 @@ class PiketController extends Controller
         return response()->json([
             'message' => 'Piket berhasil disimpan atau diperbarui.'
         ], 200);
-    } catch (\Exception $e) {
-        return response()->json([
-            'message' => 'Error: '.$e->getMessage()
-        ], 500);
     }
-}
-
-
+    
     public function rekapKontribusiBulanan(Request $request)
     {
         $request->validate([
