@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Config;
 use App\Models\AnggotaEkskul;
 use App\Models\User;
+use Illuminate\Support\Facades\Artisan;
 
 /*
 |--------------------------------------------------------------------------
@@ -19,6 +20,11 @@ use App\Models\User;
 Route::get('/', function () {
     return view('welcome');
     
+});
+
+Route::get('/storage-link', function () {
+    Artisan::call('storage:link');
+    return 'Storage linked';
 });
 
 Route::get('/env-test', function () {
