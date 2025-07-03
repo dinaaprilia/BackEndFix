@@ -47,7 +47,8 @@ public function getUserData(Request $request)
             'kelas' => $kelas,
 'foto_profil' => $user->foto_profil 
             ? asset('storage/' . $user->foto_profil)
-            : null,            'childId' => $child?->id,
+            : null,            
+            'childId' => $child?->id,
             'student' => $child ? [
                 'id' => $child->id,
                 'nama' => $child->nama,
@@ -179,8 +180,9 @@ public function getAllGuru()
             'jenis_kelamin' => $user->jenis_kelamin,
             'nomor_hp'    => $user->nomor_hp,
             'agama'       => $user->agama,
-            'foto_profil' => $user->foto_profil, // ✅ WAJIB ADA
-        ]
+'foto_profil' => $user->foto_profil 
+            ? asset('storage/' . $user->foto_profil)
+            : null,             ]
     ]);
 }
 
