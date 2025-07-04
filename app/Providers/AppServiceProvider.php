@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use App\Models\Aktivitas;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Artisan;
 
 
 class AppServiceProvider extends ServiceProvider
@@ -24,6 +25,9 @@ class AppServiceProvider extends ServiceProvider
 {
     if (env('APP_ENV') === 'production') {
         URL::forceScheme('https');
+    }
+        if (!file_exists(public_path('storage'))) {
+        Artisan::call('storage:link');
     }
 }
 }
