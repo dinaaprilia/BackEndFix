@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
-use App\Models\absensi;
+use App\Models\Absensi;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
