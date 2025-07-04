@@ -22,11 +22,6 @@ Route::get('/', function () {
     
 });
 
-Route::get('/storage-link', function () {
-    Artisan::call('storage:link');
-    return 'Storage linked';
-});
-
 Route::get('/env-test', function () {
     return response()->json([
         'env_DB_USERNAME' => env('DB_USERNAME'),
