@@ -7,7 +7,7 @@ return [
     'allowed_methods' => ['*'],
 
 
-    'allowed_origins' => ['http://localhost:3000','https://front-end-final-ivory.vercel.app'],
+    'allowed_origins' => ['http://localhost:3000','https://smansarieventify.vercel.app/'],
 
     'allowed_origins_patterns' => [],
 
