@@ -17,17 +17,18 @@ class InformasiEkskulController extends Controller
 }
 
 
-  public function store(Request $request, $id)
+public function store(Request $request, $id)
 {
     $validated = $request->validate([
         'date' => 'required|date',
         'description' => 'required|string',
         'author' => 'nullable|string',
-        'time' => 'nullable|string',
         'color' => 'nullable|string',
     ]);
 
     $validated['ekskul_id'] = $id;
+
+    $validated['time'] = now()->format('H:i');
 
     $informasi = InformasiEkskul::create($validated);
 
@@ -36,6 +37,7 @@ class InformasiEkskulController extends Controller
         'data' => $informasi
     ], 201);
 }
+
 
     public function update(Request $request, $id)
 {
