@@ -23,7 +23,7 @@ public function getStudentsByClass(Request $request)
     }
 
     $students = User::where('kelas', $kelas)
-                    ->select('nisn', 'nama', 'tanggal_lahir', 'jenis_kelamin')
+                    ->select('nisn', 'nama', 'tanggal_lahir', 'jenis_kelamin', 'foto_profil')
                     ->get();
 
     return response()->json($students);
