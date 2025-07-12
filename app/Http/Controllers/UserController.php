@@ -344,7 +344,7 @@ public function siswaGender()
         'tanggal_lahir' => $siswa->tanggal_lahir,
         'nomor_hp' => $siswa->nomor_hp,
         'email' => $siswa->email,
-        'foto' => $siswa->foto,
+        'foto' => $siswa->foto_profil,
         'statistik' => [
             'hadir' => $hadir,
             'terlambat' => $terlambat,
